@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PokeVault v8.6 - Themes & Analytics</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { background: #000; color: white; font-family: 'Inter', sans-serif; margin: 0; min-height: 100vh; }
+        #bg-container { position: fixed; inset: 0; z-index: -1; background-size: cover; background-position: center; opacity: 0.8; filter: brightness(0.9); background-image: url('https://i.imgur.com/G75Uku3.png'); transition: 0.5s; }
+        .glass { background: rgba(15, 15, 20, 0.85); border: 1px solid rgba(255,255,255,0.2); border-radius: 1.25rem; backdrop-filter: blur(20px); }
+        .card-box { background: rgba(30, 30, 35, 0.98); border: 1px solid rgba(255,255,255,0.1); border-radius: 1.25rem; overflow: hidden; transition: 0.3s; cursor: pointer; }
+        .card-box:hover { transform: translateY(-5px); border-color: inherit; }
+        input, select { background: #000 !important; color: #fff !important; border: 1px solid rgba(255,255,255,0.3) !important; outline: none !important; text-align: center; }
+        
+        /* Themes */
+        .theme-gengar { color: #bc42f5 !important; border-color: #bc42f5 !important; }
+        .theme-pikachu { color: #ffcb05 !important; border-color: #ffcb05 !important; }
+        .bg-gengar { background-color: #bc42f5 !important; }
+        .bg-pikachu { background-color: #ffcb05 !important; color: #000 !important; }
+        
+        .nav-btn.active { border-bottom: 3px solid currentColor; opacity: 1; }
+        .chart-btn { padding: 6px 12px; border-radius: 8px; font-size: 10px; font-weight: 900; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.4); transition: 0.2s; }
+        .chart-btn.active { background: currentColor; color: #000; border-color: transparent; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div id="bg-container"></div>
+    <div class="max-w-6xl mx-auto">
+        
+        <nav class="flex gap-8 mb-6 px-4">
+            <button onclick="switchMode('db')" id="navDb" class="nav-btn pb-2 text-sm font-black uppercase tracking-widest opacity-40 active">🔍 Search</button>
+            <button onclick="switchMode('col')" id="navCol" class="nav-btn pb-2 text-sm font-black uppercase tracking-widest opacity-40">🗄️ Collection</button>
+        </nav>
+
+        <header class="glass p-8 mb-8 border-white/10">
+            <div class="flex flex-wrap justify-between items-start gap-6 mb-8">
+                <div>
+                    <h1 id="logo" class="text-3xl font-black italic tracking-tighter uppercase theme-gengar">PokeVault</h1>
+                    <div class="flex gap-8 mt-4">
+                        <div class="flex flex-col"><span class="text-[8px] opacity-40 uppercase font-black">Invested</span><span id="totalPaid" class="text-white font-bold text-lg">€0.00</span></div>
+                        <div class="flex flex-col"><span class="text-[8px] opacity-40 uppercase font-black">Market Value</span><span id="totalVal" class="text-blue-400 font-bold text-lg">€0.00</span></div>
+                        <div class="flex flex-col"><span class="text-[8px] opacity-40 uppercase font-black">Net P/L</span><span id="netProfit" class="font-black text-lg">€0.00</span></div>
+                    </div>
+                </div>
+                <div class="flex flex-col items-end gap-4">
+                    <div class="flex gap-3">
+                        <button onclick="setTheme('gengar')" class="w-8 h-8 rounded-full bg-purple-700 border-2 border-white/50 hover:scale-110 transition-transform"></button>
+                        <button onclick="setTheme('pikachu')" class="w-8 h-8 rounded-full bg-yellow-500 border-2 border-white/50 hover:scale-110 transition-transform"></button>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="syncCollectionToSheets()" class="text-[10px] bg-green-600/20 text-green-400 px-4 py-2 rounded-lg uppercase font-black border border-green-500/20 hover:bg-green-600/40">☁️ Force Sync</button>
+                        <button onclick="createNewFolder()" id="addFolderBtn" class="hidden text-[10px] bg-white/10 px-4 py-2 rounded-lg uppercase font-black border border-white/10 hover:bg-white/20">+ Folder</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="h-[200px] w-full">
+                <canvas id="mainPortfolioChart"></canvas>
+            </div>
+        </header>
+
+        <div id="databaseUI">
+            <div class="glass p-4 mb-8 flex flex-wrap gap-3 w-full">
+                <input type="text" id="searchInput" onkeydown="if(event.key==='Enter') startSearch()" placeholder="Search (e.g. PFL 013, POR 045, SSP 238)..." class="flex-1 p-4 rounded-xl font-bold min-w-[200px]">
+                <button id="searchBtn" onclick="startSearch()" class="bg-gengar px-8 py-4 rounded-xl font-black uppercase text-xs transition-colors">Find Cards</button>
+            </div>
+        </div>
+
+        <div id="collectionUI" class="hidden">
+            <div id="folderTabs" class="flex gap-2 mb-6 overflow-x-auto pb-2"></div>
+        </div>
+
+        <div id="grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6"></div>
+    </div>
+
+    <div id="cardDetailsModal" class="hidden fixed inset-0 bg-black/98 z-[200] overflow-y-auto backdrop-blur-xl">
+        <div class="max-w-4xl mx-auto p-6 flex flex-col">
+            <button onclick="closeDetails()" class="self-end text-white/40 hover:text-white font-black text-2xl p-4">✕</button>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-12 mt-4">
+                <div class="flex flex-col items-center">
+                    <img id="detailImg" src="" class="w-full max-w-[320px] shadow-2xl rounded-2xl mb-8 border border-white/10">
+                    <div class="glass p-6 w-full flex justify-between items-center">
+                        <button onclick="changeQty(-1)" class="w-12 h-12 bg-white/5 rounded-full font-black text-xl hover:bg-red-500/20">-</button>
+                        <div class="text-center"><span class="text-[8px] opacity-40 block uppercase font-black">Copies</span><span id="detailQty" class="text-3xl font-black italic">1</span></div>
+                        <button onclick="changeQty(1)" class="w-12 h-12 bg-white/5 rounded-full font-black text-xl hover:bg-green-500/20">+</button>
+                    </div>
+                </div>
+                <div class="flex flex-col">
+                    <h2 id="detailName" class="text-4xl font-black italic uppercase mb-1">---</h2>
+                    <p id="detailSet" class="text-purple-400 font-bold uppercase text-xs mb-8 detail-accent">---</p>
+                    <div class="h-[250px] bg-black/40 rounded-2xl p-4 border border-white/5 mb-6"><canvas id="priceChart"></canvas></div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="glass p-4"><span class="text-[8px] opacity-40 block font-black uppercase">Market</span><span id="detailMarket" class="text-xl font-black text-green-400">€0.00</span></div>
+                        <div class="glass p-4"><span class="text-[8px] opacity-40 block font-black uppercase">Avg Paid</span><span id="detailPaid" class="text-xl font-black">€0.00</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const GOOGLE_WEB_APP_URL = "ΕΔΩ_ΒΑΛΕ_ΤΟ_URL_ΣΟΥ"; 
+        
+        let vaults = JSON.parse(localStorage.getItem('pv_v86_data')) || { 'Main Collection': [] };
+        let currentTheme = localStorage.getItem('pv_theme') || 'gengar';
+        let currentFolder = Object.keys(vaults)[0], currentMode = 'db', activeCardId = null, mainChart = null, detailChart = null;
+
+        const setMap = {
+            "PFL":"me2", "PHF":"me2", "POR":"sv9", "MEG":"za1", "ASC":"za2", "CRY":"za3", "DYN":"za4", "MEP":"zap", "PRE":"sv10",
+            "SSP":"sv8","SCR":"sv7","SFA":"sv6pt5","TWM":"sv6","TEF":"sv5","PAF":"sv4af","PAR":"sv4","151":"sv3pt5","OBF":"sv3","PAL":"sv2","SVI":"sv1","SVP":"svp",
+            "CRZ":"swsh12tg","SIT":"swsh12","LOR":"swsh11","PGO":"pgo","ASR":"swsh10","BRS":"swsh09","FST":"swsh08","EVS":"swsh07","VIV":"swsh04","SSH":"swsh01",
+            "BS":"base1","JU":"base2","FO":"base3","TR":"base5"
+        };
+
+        function setTheme(t) {
+            currentTheme = t;
+            localStorage.setItem('pv_theme', t);
+            const logo = document.getElementById('logo');
+            const searchBtn = document.getElementById('searchBtn');
+            const bg = document.getElementById('bg-container');
+            
+            logo.className = `text-3xl font-black italic tracking-tighter uppercase theme-${t}`;
+            searchBtn.className = `bg-${t} px-8 py-4 rounded-xl font-black uppercase text-xs transition-colors`;
+            bg.style.backgroundImage = t === 'gengar' ? "url('https://i.imgur.com/G75Uku3.png')" : "url('https://i.imgur.com/mtSXVDC.png')";
+            
+            // Ενημέρωση των χρωμάτων στα accents
+            document.querySelectorAll('.detail-accent').forEach(el => {
+                el.style.color = t === 'gengar' ? '#bc42f5' : '#ffcb05';
+            });
+            renderGrid();
+        }
+
+        function switchMode(m) {
+            currentMode = m;
+            document.getElementById('navDb').classList.toggle('active', m === 'db');
+            document.getElementById('navCol').classList.toggle('active', m === 'col');
+            document.getElementById('databaseUI').style.display = m === 'db' ? 'flex' : 'none';
+            document.getElementById('collectionUI').style.display = m === 'col' ? 'block' : 'none';
+            document.getElementById('addFolderBtn').style.display = m === 'col' ? 'block' : 'none';
+            renderGrid();
+        }
+
+        async function startSearch() {
+            const val = document.getElementById('searchInput').value.trim();
+            if(!val) return;
+            const grid = document.getElementById('grid');
+            grid.innerHTML = '<div class="col-span-full text-center py-20 opacity-30 font-black italic animate-pulse tracking-tighter text-4xl uppercase">SEARCHING API...</div>';
+            
+            let parts = val.split(/\s+/);
+            let query = parts.length > 1 ? `(set.id:"${setMap[parts[0].toUpperCase()] || parts[0]}" OR set.name:"${parts[0]}*") AND (number:"${parts[1]}" OR name:"${parts[1]}*")` : `name:"${val}*" OR set.id:"${setMap[val.toUpperCase()] || val}"`;
+
+            try {
+                const res = await fetch(`https://api.pokemontcg.io/v2/cards?q=${encodeURIComponent(query)}&pageSize=42`);
+                const data = await res.json();
+                grid.innerHTML = '';
+                if (data.data?.length) data.data.forEach(c => renderCard(c, true));
+            } catch(e) { grid.innerHTML = "API ERROR"; }
+        }
+
+        function renderCard(c, isSearch) {
+            const trend = c.cardmarket?.prices?.trendPrice || 0;
+            const div = document.createElement('div');
+            div.className = `card-box p-4 flex flex-col group theme-${currentTheme}`;
+            div.onclick = () => isSearch ? openAddQuick(c) : openCardDetails(c.id);
+            div.innerHTML = `
+                <div class="relative overflow-hidden rounded-lg mb-4 aspect-[3/4] bg-black/40">
+                    <img src="${c.images.small}" class="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500">
+                </div>
+                <h3 class="text-[10px] font-black truncate uppercase opacity-90">${c.name}</h3>
+                <p class="text-[7px] opacity-40 mb-3 font-bold uppercase">${c.set.name} #${c.number}</p>
+                <div class="bg-black/60 rounded-xl p-3 flex justify-between items-center text-[9px] border border-white/5">
+                    <div class="flex flex-col"><span class="opacity-20 text-[6px] font-bold uppercase">Paid</span><span>€${(c.userPaid||0).toFixed(2)}</span></div>
+                    <div class="flex flex-col text-right"><span class="opacity-20 text-[6px] font-bold uppercase">Trend</span><span class="text-green-400">€${trend.toFixed(2)}</span></div>
+                </div>
+            `;
+            document.getElementById('grid').appendChild(div);
+        }
+
+        async function openCardDetails(id) {
+            activeCardId = id;
+            let card = null;
+            for(let f in vaults) { let found = vaults[f].find(x => x.id === id); if(found) card = found; }
+            if(!card) return;
+
+            document.getElementById('cardDetailsModal').classList.remove('hidden');
+            document.getElementById('detailImg').src = card.images.large;
+            document.getElementById('detailName').innerText = card.name;
+            document.getElementById('detailSet').innerText = `${card.set.name} #${card.number}`;
+            document.getElementById('detailSet').style.color = currentTheme === 'gengar' ? '#bc42f5' : '#ffcb05';
+            document.getElementById('detailQty').innerText = card.quantity || 1;
+            document.getElementById('detailMarket').innerText = `€${(card.cardmarket?.prices?.trendPrice || 0).toFixed(2)}`;
+            document.getElementById('detailPaid').innerText = `€${(card.userPaid || 0).toFixed(2)}`;
+            
+            initDetailChart(card.cardmarket?.prices?.trendPrice || 0);
+        }
+
+        function closeDetails() { document.getElementById('cardDetailsModal').classList.add('hidden'); }
+
+        function changeQty(amt) {
+            for(let f in vaults) { 
+                let card = vaults[f].find(x => x.id === activeCardId);
+                if(card) {
+                    card.quantity = Math.max(0, (card.quantity || 1) + amt);
+                    if(card.quantity === 0) vaults[f] = vaults[f].filter(x => x.id !== activeCardId);
+                    document.getElementById('detailQty').innerText = card.quantity;
+                    saveData();
+                    if(card.quantity === 0) closeDetails();
+                    break;
+                }
+            }
+        }
+
+        async function syncCollectionToSheets() {
+            if(!GOOGLE_WEB_APP_URL || GOOGLE_WEB_APP_URL.includes("ΕΔΩ")) return;
+            try {
+                await fetch(GOOGLE_WEB_APP_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(vaults) });
+                console.log("Synced to Cloud");
+            } catch(e) { console.error("Sync Error", e); }
+        }
+
+        async function fetchHistory() {
+            if(!GOOGLE_WEB_APP_URL || GOOGLE_WEB_APP_URL.includes("ΕΔΩ")) return;
+            try {
+                const res = await fetch(GOOGLE_WEB_APP_URL);
+                const history = await res.json();
+                renderPortfolioChart(history);
+            } catch(e) { console.log("No cloud history yet"); }
+        }
+
+        function renderPortfolioChart(history) {
+            const ctx = document.getElementById('mainPortfolioChart').getContext('2d');
+            if(mainChart) mainChart.destroy();
+            const color = currentTheme === 'gengar' ? '#bc42f5' : '#ffcb05';
+            mainChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: history.map(h => new Date(h.date).toLocaleDateString()),
+                    datasets: [{
+                        data: history.map(h => h.value),
+                        borderColor: color,
+                        fill: true,
+                        backgroundColor: `${color}1A`,
+                        tension: 0.4, pointRadius: 0
+                    }]
+                },
+                options: { plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { ticks: { color: '#444' } } } }
+            });
+        }
+
+        function initDetailChart(base) {
+            const ctx = document.getElementById('priceChart').getContext('2d');
+            if(detailChart) detailChart.destroy();
+            const color = currentTheme === 'gengar' ? '#bc42f5' : '#ffcb05';
+            detailChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [1,2,3,4,5,6,7],
+                    datasets: [{
+                        data: [base*0.98, base*1.02, base, base*0.99, base*1.01, base*1.03, base],
+                        borderColor: color, tension: 0.4, pointRadius: 0
+                    }]
+                },
+                options: { plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { grid: { color: 'rgba(255,255,255,0.05)' } } } }
+            });
+        }
+
+        async function openAddQuick(card) {
+            const price = prompt("Price Paid?", card.cardmarket?.prices?.trendPrice || 0);
+            if(price === null) return;
+            card.userPaid = parseFloat(price);
+            card.quantity = 1;
+            vaults[currentFolder].unshift(card);
+            saveData();
+            alert("Added!");
+        }
+
+        function renderGrid() {
+            const grid = document.getElementById('grid'); grid.innerHTML = '';
+            if(currentMode === 'db') return;
+            const color = currentTheme === 'gengar' ? '#bc42f5' : '#ffcb05';
+            document.getElementById('folderTabs').innerHTML = Object.keys(vaults).map(f => `<button onclick="currentFolder='${f}';renderGrid()" class="px-6 py-2 rounded-xl border border-white/10 text-[10px] font-black uppercase ${currentFolder === f ? 'bg-white/10' : 'opacity-30'}" style="border-color: ${currentFolder === f ? color : ''}">${f}</button>`).join('');
+            let v = 0, p = 0;
+            vaults[currentFolder].forEach(c => { v += (c.cardmarket?.prices?.trendPrice || 0) * c.quantity; p += (c.userPaid || 0) * c.quantity; renderCard(c, false); });
+            document.getElementById('totalVal').innerText = `€${v.toFixed(2)}`;
+            document.getElementById('totalPaid').innerText = `€${p.toFixed(2)}`;
+            const n = v - p;
+            document.getElementById('netProfit').innerText = `${n >= 0 ? '+' : ''}€${n.toFixed(2)}`;
+            document.getElementById('netProfit').className = `font-black text-lg ${n >= 0 ? 'text-green-400' : 'text-red-500'}`;
+        }
+
+        function createNewFolder() { const n = prompt("Name:"); if(n && !vaults[n]) { vaults[n] = []; currentFolder = n; saveData(); } }
+        function saveData() { 
+            localStorage.setItem('pv_v86_data', JSON.stringify(vaults)); 
+            syncCollectionToSheets();
+            if(currentMode === 'col') renderGrid(); 
+        }
+
+        window.onload = () => { setTheme(currentTheme); fetchHistory(); };
+        switchMode('db');
+    </script>
+</body>
+</html>
