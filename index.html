@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PokeVault v9.2 - Folders Restored</title>
+    <title>PokeVault v9.3 - Pro Tracking</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -12,7 +12,7 @@
         .glass { background: rgba(15, 15, 20, 0.85); border: 1px solid rgba(255,255,255,0.2); border-radius: 1.25rem; backdrop-filter: blur(20px); }
         .card-box { background: rgba(30, 30, 35, 0.98); border: 1px solid rgba(255,255,255,0.1); border-radius: 1.25rem; overflow: hidden; transition: 0.3s; cursor: pointer; position: relative; }
         .card-box:hover { transform: translateY(-5px); border-color: inherit; }
-        .qty-badge { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.9); border: 1px solid rgba(255,255,255,0.3); padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 900; z-index: 10; color: #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        .qty-badge { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.9); border: 1px solid rgba(255,255,255,0.3); padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 900; z-index: 10; color: #fff; }
         input, select { background: rgba(0,0,0,0.5) !important; color: #fff !important; border: 1px solid rgba(255,255,255,0.2) !important; outline: none !important; }
         .theme-gengar { color: #bc42f5 !important; border-color: #bc42f5 !important; }
         .theme-pikachu { color: #ffcb05 !important; border-color: #ffcb05 !important; }
@@ -88,18 +88,18 @@
                 <div class="flex flex-col items-center">
                     <img id="detailImg" src="" class="w-full max-w-[320px] shadow-2xl rounded-2xl mb-8 border border-white/10">
                     <div class="glass p-6 w-full flex justify-between items-center">
-                        <button onclick="changeQty(-1)" class="w-12 h-12 bg-white/5 rounded-full font-black text-xl hover:bg-red-500/20">-</button>
-                        <div class="text-center"><span class="text-[8px] opacity-40 block uppercase font-black">Total Copies</span><span id="detailQty" class="text-3xl font-black italic">1</span></div>
-                        <button onclick="changeQty(1)" class="w-12 h-12 bg-white/5 rounded-full font-black text-xl hover:bg-green-500/20">+</button>
+                        <button onclick="changeQty(-1)" class="w-12 h-12 bg-white/5 rounded-full font-black text-xl">-</button>
+                        <div class="text-center"><span class="text-[8px] opacity-40 block uppercase font-black">Copies</span><span id="detailQty" class="text-3xl font-black italic">1</span></div>
+                        <button onclick="changeQty(1)" class="w-12 h-12 bg-white/5 rounded-full font-black text-xl">+</button>
                     </div>
                 </div>
                 <div class="flex flex-col">
                     <h2 id="detailName" class="text-4xl font-black italic uppercase mb-1">---</h2>
                     <p id="detailSet" class="text-purple-400 font-bold uppercase text-xs mb-8">---</p>
-                    <div class="h-[200px] bg-black/40 rounded-2xl p-4 border border-white/5 mb-6"><canvas id="priceChart"></canvas></div>
+                    <div class="h-[250px] bg-black/40 rounded-2xl p-4 border border-white/5 mb-6"><canvas id="priceChart"></canvas></div>
                     <div class="grid grid-cols-2 gap-4">
-                        <div class="glass p-4"><span class="text-[8px] opacity-40 block font-black uppercase">Market (Unit)</span><span id="detailMarket" class="text-xl font-black text-green-400">€0.00</span></div>
-                        <div class="glass p-4"><span class="text-[8px] opacity-40 block font-black uppercase">Avg Paid (Unit)</span><span id="detailPaid" class="text-xl font-black">€0.00</span></div>
+                        <div class="glass p-4"><span class="text-[8px] opacity-40 block uppercase">Market</span><span id="detailMarket" class="text-xl font-black text-green-400">€0.00</span></div>
+                        <div class="glass p-4"><span class="text-[8px] opacity-40 block uppercase">Avg Paid</span><span id="detailPaid" class="text-xl font-black">€0.00</span></div>
                     </div>
                 </div>
             </div>
@@ -109,10 +109,10 @@
     <script>
         const GOOGLE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzEXgzNPbTOtwKQtXznhlq-isS7lEt24sB-xatz3Z8nJyAUbxgMc9tf9-P4t9rL5St2/exec"; 
         
-        let vaults = JSON.parse(localStorage.getItem('pv_v92_data')) || { 'Main Collection': [] };
+        let vaults = JSON.parse(localStorage.getItem('pv_v93_data')) || { 'Main Collection': [] };
         let currentTheme = localStorage.getItem('pv_theme') || 'gengar';
         let currentFolder = Object.keys(vaults)[0], currentMode = 'db', activeCardId = null, mainChart = null, detailChart = null;
-        let lastSearchResults = [];
+        let lastSearchResults = [], cloudHistory = { global: [], cards: {} };
 
         const setMap = { "PFL":"me2", "POR":"sv9", "SSP":"sv8", "SCR":"sv7", "151":"sv3pt5", "PAF":"sv4af", "BS":"base1" };
 
@@ -139,12 +139,8 @@
         }
 
         function createNewFolder() {
-            const name = prompt("Όνομα νέου φακέλου:");
-            if(name && !vaults[name]) {
-                vaults[name] = [];
-                currentFolder = name;
-                saveData();
-            }
+            const name = prompt("New Folder Name:");
+            if(name && !vaults[name]) { vaults[name] = []; currentFolder = name; saveData(); }
         }
 
         function applySort(list) {
@@ -165,11 +161,8 @@
                 applySort(lastSearchResults).forEach(c => renderCard(c, true));
                 document.getElementById('gridTitle').innerText = "Search Results";
             } else {
-                // Render Folder Tabs
                 document.getElementById('folderTabs').innerHTML = Object.keys(vaults).map(f => `
-                    <button onclick="currentFolder='${f}';renderGrid()" 
-                        class="px-6 py-2 rounded-xl border border-white/10 text-[10px] font-black uppercase transition-all whitespace-nowrap ${currentFolder === f ? 'bg-white/10' : 'opacity-30'}" 
-                        style="border-color: ${currentFolder === f ? color : ''}">${f}</button>
+                    <button onclick="currentFolder='${f}';renderGrid()" class="px-6 py-2 rounded-xl border border-white/10 text-[10px] font-black uppercase transition-all whitespace-nowrap ${currentFolder === f ? 'bg-white/10' : 'opacity-30'}" style="border-color: ${currentFolder === f ? color : ''}">${f}</button>
                 `).join('');
                 
                 const sorted = applySort(vaults[currentFolder]);
@@ -199,36 +192,34 @@
                 <h3 class="text-[10px] font-black truncate uppercase opacity-90">${c.name}</h3>
                 <p class="text-[7px] opacity-40 mb-3 font-bold uppercase">${c.set.name} #${c.number}</p>
                 <div class="bg-black/60 rounded-xl p-3 flex justify-between items-center text-[9px] border border-white/5">
-                    <div class="flex flex-col"><span class="opacity-20 text-[6px] font-bold uppercase tracking-widest">Paid</span><span>€${(c.userPaid||0).toFixed(2)}</span></div>
-                    <div class="flex flex-col text-right"><span class="opacity-20 text-[6px] font-bold uppercase tracking-widest">Market</span><span class="text-green-400">€${trend.toFixed(2)}</span></div>
+                    <div class="flex flex-col"><span class="opacity-20 text-[6px] font-bold uppercase">Paid</span><span>€${(c.userPaid||0).toFixed(2)}</span></div>
+                    <div class="flex flex-col text-right"><span class="opacity-20 text-[6px] font-bold uppercase">Trend</span><span class="text-green-400">€${trend.toFixed(2)}</span></div>
                 </div>
             `;
             grid.appendChild(div);
         }
 
         async function openAddBulk(card) {
-            const qtyStr = prompt(`Πόσες κόπιες "${card.name}" να προσθέσω στο "${currentFolder}";`, "1");
+            const qtyStr = prompt("How many copies?", "1");
             if(!qtyStr) return;
             const qty = parseInt(qtyStr) || 1;
-            const priceStr = prompt(`Συνολικό κόστος αγοράς για ${qty} κάρτες;`, (card.cardmarket?.prices?.trendPrice * qty || 0).toFixed(2));
+            const priceStr = prompt(`Total price for ${qty} cards?`, (card.cardmarket?.prices?.trendPrice * qty || 0).toFixed(2));
             if(!priceStr) return;
             const unitPaid = parseFloat(priceStr) / qty;
 
             let existing = vaults[currentFolder].find(x => x.id === card.id);
             if(existing) {
                 const totalOldCost = existing.userPaid * existing.quantity;
-                const totalNewCost = unitPaid * qty;
                 existing.quantity += qty;
-                existing.userPaid = (totalOldCost + totalNewCost) / existing.quantity;
+                existing.userPaid = (totalOldCost + (unitPaid * qty)) / existing.quantity;
             } else {
-                card.userPaid = unitPaid;
-                card.quantity = qty;
+                card.userPaid = unitPaid; card.quantity = qty;
                 vaults[currentFolder].unshift(card);
             }
             saveData();
         }
 
-        async function openCardDetails(id) {
+        function openCardDetails(id) {
             activeCardId = id; let card = vaults[currentFolder].find(x => x.id === id);
             if(!card) return;
             document.getElementById('cardDetailsModal').classList.remove('hidden');
@@ -238,7 +229,7 @@
             document.getElementById('detailQty').innerText = card.quantity;
             document.getElementById('detailMarket').innerText = `€${(card.cardmarket?.prices?.trendPrice || 0).toFixed(2)}`;
             document.getElementById('detailPaid').innerText = `€${(card.userPaid || 0).toFixed(2)}`;
-            initDetailChart(card.cardmarket?.prices?.trendPrice || 0);
+            initDetailChart(id);
         }
 
         function closeDetails() { document.getElementById('cardDetailsModal').classList.add('hidden'); }
@@ -247,12 +238,10 @@
             let card = vaults[currentFolder].find(x => x.id === activeCardId);
             if(!card) return;
             if(amt === -1 && card.quantity > 1) {
-                const rem = prompt(`Έχεις ${card.quantity} κόπιες. Πόσες να αφαιρέσω;`, "1");
+                const rem = prompt(`Remove how many? (Total: ${card.quantity})`, "1");
                 if(!rem) return;
                 card.quantity = Math.max(0, card.quantity - (parseInt(rem) || 1));
-            } else {
-                card.quantity = Math.max(0, card.quantity + amt);
-            }
+            } else { card.quantity = Math.max(0, card.quantity + amt); }
             if(card.quantity <= 0) vaults[currentFolder] = vaults[currentFolder].filter(x => x.id !== activeCardId);
             document.getElementById('detailQty').innerText = card.quantity || 0;
             saveData(); if(card.quantity <= 0) closeDetails();
@@ -262,7 +251,7 @@
             if(!GOOGLE_WEB_APP_URL || GOOGLE_WEB_APP_URL.includes("ΒΑΛΕ")) return;
             try { 
                 await fetch(GOOGLE_WEB_APP_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(vaults) }); 
-                if(manual) alert("Sync Complete!");
+                if(manual) { alert("Sync Successful!"); fetchHistory(); }
             } catch(e) {}
         }
 
@@ -270,8 +259,8 @@
             if(!GOOGLE_WEB_APP_URL || GOOGLE_WEB_APP_URL.includes("ΒΑΛΕ")) return;
             try {
                 const res = await fetch(GOOGLE_WEB_APP_URL);
-                const history = await res.json();
-                if(history.length > 0) renderPortfolioChart(history);
+                cloudHistory = await res.json();
+                if(cloudHistory.global.length > 0) renderPortfolioChart(cloudHistory.global);
             } catch(e) {}
         }
 
@@ -289,17 +278,22 @@
             });
         }
 
-        function initDetailChart(base) {
+        function initDetailChart(cardId) {
             const ctx = document.getElementById('priceChart').getContext('2d');
             if(detailChart) detailChart.destroy();
+            
+            let history = cloudHistory.cards[cardId] || [];
+            let labels = history.length > 0 ? history.map(h => new Date(h.date).toLocaleDateString()) : ['Today'];
+            let prices = history.length > 0 ? history.map(h => h.price) : [0];
+
             const color = currentTheme === 'gengar' ? '#bc42f5' : '#ffcb05';
             detailChart = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: [1,2,3,4,5,6,7],
-                    datasets: [{ data: [base*0.98, base*1.02, base, base*0.99, base*1.01, base*1.03, base], borderColor: color, tension: 0.4, pointRadius: 0 }]
+                    labels: labels,
+                    datasets: [{ data: prices, borderColor: color, tension: 0.4, pointRadius: 3, fill: true, backgroundColor: `${color}1A` }]
                 },
-                options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { grid: { color: 'rgba(255,255,255,0.05)' } } } }
+                options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#555', font: { size: 8 } } }, y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#555' } } } }
             });
         }
 
@@ -314,9 +308,8 @@
         }
 
         function saveData() { 
-            localStorage.setItem('pv_v92_data', JSON.stringify(vaults)); 
-            syncCollectionToSheets(false); 
-            renderGrid(); 
+            localStorage.setItem('pv_v93_data', JSON.stringify(vaults)); 
+            syncCollectionToSheets(false); renderGrid(); 
         }
 
         window.onload = () => { setTheme(currentTheme); fetchHistory(); };
