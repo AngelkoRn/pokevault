@@ -3,15 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PokeVault v9.0 - Classic Search & Sort</title>
+    <title>PokeVault v9.1 - Inventory Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { background: #000; color: white; font-family: 'Inter', sans-serif; margin: 0; min-height: 100vh; }
         #bg-container { position: fixed; inset: 0; z-index: -1; background-size: cover; background-position: center; opacity: 0.8; filter: brightness(0.9); transition: 0.5s; background-image: url('https://i.imgur.com/G75Uku3.png'); }
         .glass { background: rgba(15, 15, 20, 0.85); border: 1px solid rgba(255,255,255,0.2); border-radius: 1.25rem; backdrop-filter: blur(20px); }
-        .card-box { background: rgba(30, 30, 35, 0.98); border: 1px solid rgba(255,255,255,0.1); border-radius: 1.25rem; overflow: hidden; transition: 0.3s; cursor: pointer; }
+        .card-box { background: rgba(30, 30, 35, 0.98); border: 1px solid rgba(255,255,255,0.1); border-radius: 1.25rem; overflow: hidden; transition: 0.3s; cursor: pointer; position: relative; }
         .card-box:hover { transform: translateY(-5px); border-color: inherit; }
+        .qty-badge { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 900; z-index: 10; color: #fff; }
         input, select { background: rgba(0,0,0,0.5) !important; color: #fff !important; border: 1px solid rgba(255,255,255,0.2) !important; outline: none !important; }
         .theme-gengar { color: #bc42f5 !important; border-color: #bc42f5 !important; }
         .theme-pikachu { color: #ffcb05 !important; border-color: #ffcb05 !important; }
@@ -44,7 +45,7 @@
                         <button onclick="setTheme('gengar')" class="w-8 h-8 rounded-full bg-purple-700 border-2 border-white/50 hover:scale-110 transition-transform"></button>
                         <button onclick="setTheme('pikachu')" class="w-8 h-8 rounded-full bg-yellow-500 border-2 border-white/50 hover:scale-110 transition-transform"></button>
                     </div>
-                    <button onclick="syncCollectionToSheets()" class="text-[10px] bg-green-600/20 text-green-400 px-4 py-2 rounded-lg uppercase font-black border border-green-500/20">☁️ Force Sync</button>
+                    <button onclick="syncCollectionToSheets(true)" class="text-[10px] bg-green-600/20 text-green-400 px-4 py-2 rounded-lg uppercase font-black border border-green-500/20">☁️ Force Sync</button>
                 </div>
             </div>
             <div class="h-[120px] w-full"><canvas id="mainPortfolioChart"></canvas></div>
@@ -85,7 +86,7 @@
                     <img id="detailImg" src="" class="w-full max-w-[320px] shadow-2xl rounded-2xl mb-8 border border-white/10">
                     <div class="glass p-6 w-full flex justify-between items-center">
                         <button onclick="changeQty(-1)" class="w-12 h-12 bg-white/5 rounded-full font-black text-xl">-</button>
-                        <div class="text-center"><span class="text-[8px] opacity-40 block uppercase font-black">Copies</span><span id="detailQty" class="text-3xl font-black italic">1</span></div>
+                        <div class="text-center"><span class="text-[8px] opacity-40 block uppercase font-black">Total Copies</span><span id="detailQty" class="text-3xl font-black italic">1</span></div>
                         <button onclick="changeQty(1)" class="w-12 h-12 bg-white/5 rounded-full font-black text-xl">+</button>
                     </div>
                 </div>
@@ -94,8 +95,8 @@
                     <p id="detailSet" class="text-purple-400 font-bold uppercase text-xs mb-8">---</p>
                     <div class="h-[200px] bg-black/40 rounded-2xl p-4 border border-white/5 mb-6"><canvas id="priceChart"></canvas></div>
                     <div class="grid grid-cols-2 gap-4">
-                        <div class="glass p-4"><span class="text-[8px] opacity-40 block font-black uppercase">Market</span><span id="detailMarket" class="text-xl font-black text-green-400">€0.00</span></div>
-                        <div class="glass p-4"><span class="text-[8px] opacity-40 block font-black uppercase">Paid</span><span id="detailPaid" class="text-xl font-black">€0.00</span></div>
+                        <div class="glass p-4"><span class="text-[8px] opacity-40 block font-black uppercase">Market (Unit)</span><span id="detailMarket" class="text-xl font-black text-green-400">€0.00</span></div>
+                        <div class="glass p-4"><span class="text-[8px] opacity-40 block font-black uppercase">Avg Paid (Unit)</span><span id="detailPaid" class="text-xl font-black">€0.00</span></div>
                     </div>
                 </div>
             </div>
@@ -105,7 +106,7 @@
     <script>
         const GOOGLE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzEXgzNPbTOtwKQtXznhlq-isS7lEt24sB-xatz3Z8nJyAUbxgMc9tf9-P4t9rL5St2/exec"; 
         
-        let vaults = JSON.parse(localStorage.getItem('pv_v9_data')) || { 'Main Collection': [] };
+        let vaults = JSON.parse(localStorage.getItem('pv_v91_data')) || { 'Main Collection': [] };
         let currentTheme = localStorage.getItem('pv_theme') || 'gengar';
         let currentFolder = Object.keys(vaults)[0], currentMode = 'db', activeCardId = null, mainChart = null, detailChart = null;
         let lastSearchResults = [];
@@ -125,10 +126,8 @@
             if(!val) return;
             const grid = document.getElementById('grid');
             grid.innerHTML = '<div class="col-span-full text-center py-20 opacity-30 font-black italic animate-pulse text-4xl uppercase">SEARCHING...</div>';
-            
             let parts = val.split(/\s+/);
             let query = parts.length > 1 ? `(set.id:"${setMap[parts[0].toUpperCase()] || parts[0]}" OR set.name:"${parts[0]}*") AND (number:"${parts[1]}" OR name:"${parts[1]}*")` : `name:"${val}*" OR set.id:"${setMap[val.toUpperCase()] || val}"`;
-
             try {
                 const res = await fetch(`https://api.pokemontcg.io/v2/cards?q=${encodeURIComponent(query)}&pageSize=42`);
                 const data = await res.json();
@@ -143,7 +142,7 @@
                 if(mode === 'priceHigh') return (b.cardmarket?.prices?.trendPrice || 0) - (a.cardmarket?.prices?.trendPrice || 0);
                 if(mode === 'priceLow') return (a.cardmarket?.prices?.trendPrice || 0) - (b.cardmarket?.prices?.trendPrice || 0);
                 if(mode === 'name') return a.name.localeCompare(b.name);
-                return 0; // Recent
+                return 0;
             });
         }
 
@@ -153,6 +152,9 @@
                 applySort(lastSearchResults).forEach(c => renderCard(c, true));
                 document.getElementById('gridTitle').innerText = "Search Results";
             } else {
+                const color = currentTheme === 'gengar' ? '#bc42f5' : '#ffcb05';
+                document.getElementById('folderTabs').innerHTML = Object.keys(vaults).map(f => `<button onclick="currentFolder='${f}';renderGrid()" class="px-6 py-2 rounded-xl border border-white/10 text-[10px] font-black uppercase ${currentFolder === f ? 'bg-white/10' : 'opacity-30'}" style="border-color: ${currentFolder === f ? color : ''}">${f}</button>`).join('');
+                
                 const sorted = applySort(vaults[currentFolder]);
                 let v = 0, p = 0;
                 sorted.forEach(c => { 
@@ -172,8 +174,9 @@
             const trend = c.cardmarket?.prices?.trendPrice || 0;
             const div = document.createElement('div');
             div.className = `card-box p-4 flex flex-col group theme-${currentTheme}`;
-            div.onclick = () => isSearch ? openAddQuick(c) : openCardDetails(c.id);
+            div.onclick = () => isSearch ? openAddBulk(c) : openCardDetails(c.id);
             div.innerHTML = `
+                ${!isSearch && c.quantity > 1 ? `<div class="qty-badge">x${c.quantity}</div>` : ''}
                 <div class="relative overflow-hidden rounded-lg mb-4 aspect-[3/4] bg-black/40"><img src="${c.images.small}" class="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"></div>
                 <h3 class="text-[10px] font-black truncate uppercase opacity-90">${c.name}</h3>
                 <p class="text-[7px] opacity-40 mb-3 font-bold uppercase">${c.set.name} #${c.number}</p>
@@ -185,6 +188,31 @@
             document.getElementById('grid').appendChild(div);
         }
 
+        async function openAddBulk(card) {
+            const qtyStr = prompt("Πόσες κόπιες θέλεις να προσθέσεις;", "1");
+            if(qtyStr === null) return;
+            const qty = parseInt(qtyStr) || 1;
+            
+            const priceStr = prompt(`Συνολικό κόστος για ${qty} κάρτες;`, (card.cardmarket?.prices?.trendPrice * qty || 0).toFixed(2));
+            if(priceStr === null) return;
+            
+            const unitPaid = parseFloat(priceStr) / qty;
+            
+            // Check αν υπάρχει ήδη η κάρτα στο φάκελο για να τις "στιβάξουμε"
+            let existing = vaults[currentFolder].find(x => x.id === card.id);
+            if(existing) {
+                const totalOldCost = existing.userPaid * existing.quantity;
+                const totalNewCost = unitPaid * qty;
+                existing.quantity += qty;
+                existing.userPaid = (totalOldCost + totalNewCost) / existing.quantity; // Average price
+            } else {
+                card.userPaid = unitPaid;
+                card.quantity = qty;
+                vaults[currentFolder].unshift(card);
+            }
+            saveData();
+        }
+
         async function openCardDetails(id) {
             activeCardId = id; let card = null;
             for(let f in vaults) { let found = vaults[f].find(x => x.id === id); if(found) card = found; }
@@ -193,7 +221,7 @@
             document.getElementById('detailImg').src = card.images.large;
             document.getElementById('detailName').innerText = card.name;
             document.getElementById('detailSet').innerText = `${card.set.name} #${card.number}`;
-            document.getElementById('detailQty').innerText = card.quantity || 1;
+            document.getElementById('detailQty').innerText = card.quantity;
             document.getElementById('detailMarket').innerText = `€${(card.cardmarket?.prices?.trendPrice || 0).toFixed(2)}`;
             document.getElementById('detailPaid').innerText = `€${(card.userPaid || 0).toFixed(2)}`;
             initDetailChart(card.cardmarket?.prices?.trendPrice || 0);
@@ -205,17 +233,27 @@
             for(let f in vaults) { 
                 let card = vaults[f].find(x => x.id === activeCardId);
                 if(card) {
-                    card.quantity = Math.max(0, (card.quantity || 1) + amt);
-                    if(card.quantity === 0) vaults[f] = vaults[f].filter(x => x.id !== activeCardId);
+                    if(amt === -1 && card.quantity > 1) {
+                        const rem = prompt(`Έχεις ${card.quantity} κόπιες. Πόσες να αφαιρέσω;`, "1");
+                        if(rem === null) return;
+                        card.quantity = Math.max(0, card.quantity - (parseInt(rem) || 1));
+                    } else {
+                        card.quantity = Math.max(0, card.quantity + amt);
+                    }
+                    
+                    if(card.quantity <= 0) vaults[f] = vaults[f].filter(x => x.id !== activeCardId);
                     document.getElementById('detailQty').innerText = card.quantity;
-                    saveData(); if(card.quantity === 0) closeDetails(); break;
+                    saveData(); if(card.quantity <= 0) closeDetails(); break;
                 }
             }
         }
 
-        async function syncCollectionToSheets() {
+        async function syncCollectionToSheets(isManual = false) {
             if(!GOOGLE_WEB_APP_URL || GOOGLE_WEB_APP_URL.includes("ΒΑΛΕ")) return;
-            try { await fetch(GOOGLE_WEB_APP_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(vaults) }); alert("Cloud Synced!"); } catch(e) {}
+            try { 
+                await fetch(GOOGLE_WEB_APP_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(vaults) }); 
+                if(isManual) alert("Manual Sync Complete!");
+            } catch(e) {}
         }
 
         async function fetchHistory() {
@@ -255,13 +293,6 @@
             });
         }
 
-        async function openAddQuick(card) {
-            const price = prompt("Price Paid?", card.cardmarket?.prices?.trendPrice || 0);
-            if(price === null) return;
-            card.userPaid = parseFloat(price); card.quantity = 1;
-            vaults[currentFolder].unshift(card); saveData();
-        }
-
         function switchMode(m) {
             currentMode = m;
             document.getElementById('navDb').classList.toggle('active', m === 'db');
@@ -272,8 +303,8 @@
         }
 
         function saveData() { 
-            localStorage.setItem('pv_v9_data', JSON.stringify(vaults)); 
-            syncCollectionToSheets(); renderGrid(); 
+            localStorage.setItem('pv_v91_data', JSON.stringify(vaults)); 
+            syncCollectionToSheets(false); renderGrid(); 
         }
 
         window.onload = () => { setTheme(currentTheme); fetchHistory(); };
